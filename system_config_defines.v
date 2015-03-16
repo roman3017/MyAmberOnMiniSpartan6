@@ -48,8 +48,12 @@
 
 
 // Frequency = 800 / AMBER_CLK_DIVIDER
+// 8 = 100.00 MHz
+// 13 = 61.54 MHz
+// 16 = 50.00 MHz
 // 20 = 40.00 MHz
 // 24 = 33.33 MHz
+// 25 = 32.00 MHz
 // 29 = 27.58 MHz
 // 40 = 20.00 MHz
 //
@@ -57,9 +61,10 @@
 // by a value specified in $AMBER_BASE/hw/fpga/bin/Makefile
 `ifdef XILINX_VIRTEX6_FPGA
     `define AMBER_CLK_DIVIDER 13
-`else 
+`else
+//    `define AMBER_CLK_DIVIDER 8
 //    `define AMBER_CLK_DIVIDER 16
-    `define AMBER_CLK_DIVIDER 24
+    `define AMBER_CLK_DIVIDER 25
 `endif
 
 // Specify a device, if none defined then the
@@ -76,7 +81,7 @@
 
 
 // --------------------------------------------------------------------
-// Debug switches 
+// Debug switches
 // --------------------------------------------------------------------
 
 // Add jitter to wishbone accesses
@@ -106,7 +111,7 @@
 // `define AMBER_DUMP_VCD
 // Measured in system clock ticks
 //`define AMBER_DUMP_START  25348000
-`define AMBER_DUMP_LENGTH 150000
+//`define AMBER_DUMP_LENGTH 150000
 
 // --------------------------------------------------------------------
 // Xilinx FPGA ?
@@ -118,7 +123,7 @@
     `define XILINX_FPGA
 `endif
 
-    
+
 // --------------------------------------------------------------------
 // File Names
 // --------------------------------------------------------------------
@@ -132,8 +137,7 @@
     `define BOOT_MEM_FILE           "../tests/add.mem"
 `endif
 `ifndef BOOT_MEM_PARAMS_FILE
-//    `define BOOT_MEM_PARAMS_FILE    "not-defined"
-    `define BOOT_MEM_PARAMS_FILE    "boot-loader-serial_memparams32.v"
+    `define BOOT_MEM_PARAMS_FILE    "boot-loader-serial/boot-loader-serial_memparams32.v"
 `endif
 `ifndef AMBER_LOG_FILE
     `define AMBER_LOG_FILE          "tests.log"

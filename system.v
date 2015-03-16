@@ -39,7 +39,7 @@
 // from http://www.opencores.org/lgpl.shtml                     //
 //                                                              //
 //////////////////////////////////////////////////////////////////
-
+`include "system_config_defines.v"
 
 module system
 (
@@ -75,7 +75,7 @@ wire                       brd_clk_p;
 wire            sys_clk;    // System clock
 wire            sys_rst;    // Active high reset, synchronous to sys_clk
 wire            clk_200;    // 200MHz from board
-
+wire            sdram_clk;    // SDRAM clock
 
 
 // ======================================
@@ -164,29 +164,37 @@ wire      [2:0]             timer_int;
 //    .o_clk_200          ( clk_200           )
 //);
 //assign brd_clk_n = brd_clk;
-//assign brd_clk_p = ~brd_clk;  
+//assign brd_clk_p = ~brd_clk;
 
-reg [23:0] clk_divider = 0;
-always @(posedge brd_clk)
-	clk_divider <= clk_divider + 1;
+clocking u_clocking (
+    .CLK_in(brd_clk),
+    .CLK_x1(sys_clk),
+    .CLK_x2(),
+    .CLK_x3(sdram_clk),
+    .CLK_x4()
+);
+
+//reg [23:0] clk_divider = 0;
+//always @(posedge brd_clk)
+//	clk_divider <= clk_divider + 1;
+//assign sys_clk = brd_clk;
+//assign sys_clk = clk_divider[8];
 
 
-reg reset_reg=1;  // initial value is '1'
-reg [7:0] reset_dly_cnt=0;
-always @(posedge brd_clk)
-  begin
-    if (~brd_rst) 
-                begin
-                        reset_reg <= 1; 
-                        reset_dly_cnt <= 0;
-                end
-    if (reset_dly_cnt < 8'hff) reset_dly_cnt <= reset_dly_cnt + 1;  // count to 255d, then stop
-    else reset_reg <= 0;  // deassert reset at terminal count
-  end
+reg reset_reg = 1;  // initial value is '1'
+reg [7:0] reset_dly_cnt = 0;
+always @(posedge sys_clk)
+begin
+	if (~brd_rst)
+	begin
+		reset_reg <= 1;
+		reset_dly_cnt <= 0;
+	end
+	if (reset_dly_cnt < 8'hff) reset_dly_cnt <= reset_dly_cnt + 1;  // count to 255d, then stop
+	else reset_reg <= 0;  // deassert reset at terminal count
+end
  
 assign sys_rst = reset_reg; //~brd_rst;
-assign sys_clk = brd_clk;
-//assign sys_clk = clk_divider[8];
 
 //assign system_rdy = phy_init_done && !sys_rst;
 assign system_rdy = !sys_rst;
@@ -301,10 +309,14 @@ end
 endgenerate
 
 // -------------------------------------------------------------
-// Instantiate SDRAM Memory 
+// Instantiate SDRAM Memory
+// 8K Refresh Cycles/64 mS
 // -------------------------------------------------------------
-SDRAM_WB_CTRL sdram0 (
-        .WB_CLK_I               ( sys_clk         ),
+SDRAM_WB_CTRL # (
+		.cycles_per_refresh((64000*96)/8192-1)
+	)
+sdram0 (
+        .WB_CLK_I               ( sdram_clk       ),
         .WB_RST_I               ( sys_rst         ),
         .WB_ADR_I               ( s_wb_adr  [2]   ),
         .WB_SEL_I               ( s_wb_sel  [2]   ),
@@ -325,7 +337,6 @@ SDRAM_WB_CTRL sdram0 (
 		  .SDRAM_DQM              ( SDRAM_DQM   ),
 		  .SDRAM_RAS              ( SDRAM_RAS   ),
 		  .SDRAM_WE               ( SDRAM_WE    )
-
     );
 	 
 assign s_wb_err[2] = 1'd0;

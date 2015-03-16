@@ -131,11 +131,9 @@ localparam real UART_BAUD         = `AMBER_UART_BAUD;            // Hz
 localparam real CLK_FREQ          = 1200.0 / `AMBER_CLK_DIVIDER ; // MHz
 `else
 localparam real CLK_FREQ          = 800.0 / `AMBER_CLK_DIVIDER ; // MHz
-//localparam real CLK_FREQ          = 50.0 / `AMBER_CLK_DIVIDER ; // MHz
 `endif
 
 localparam real UART_BIT_PERIOD   = 1000000000 / UART_BAUD;      // nS
-//localparam real UART_BIT_PERIOD   = 50000000 / UART_BAUD;      // nS
 localparam real UART_WORD_PERIOD  = ( UART_BIT_PERIOD * 12 );    // nS
 localparam real CLK_PERIOD        = 1000 / CLK_FREQ;             // nS
 localparam real CLKS_PER_WORD     = UART_WORD_PERIOD / CLK_PERIOD;

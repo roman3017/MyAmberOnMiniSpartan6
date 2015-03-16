@@ -7,7 +7,7 @@
 //                                                              //
 //  Description                                                 //
 //  The main functions for the boot loader application. This    //
-//  application is embedded in the FPGA's SRAM and is used      // 
+//  application is embedded in the FPGA's SRAM and is used      //
 //  to load larger applications into the DDR3 memory on         //
 //  the development board.                                      //
 //                                                              //
@@ -57,67 +57,66 @@ int main ( void ) {
 
     /* Enable the UART FIFO */
     *(unsigned int *) ADR_AMBER_UART0_LCRH = 0x10;
-    
+
     printf("%cAmber Boot Loader v%s\n", 0xc, AMBER_FPGA_VERSION );  /* 0xc == new page */
-    
+
 
     /* When ADR_AMBER_TEST_SIM_CTRL is non-zero, its a Verilog simulation.
        The  ADR_AMBER_TEST_SIM_CTRL register is always 0 in the real fpga
        The register is in vlog/system/test_module.v
-    */   
     if ( *(unsigned int *) ADR_AMBER_TEST_SIM_CTRL ) {
         load_run(*(unsigned int *) ADR_AMBER_TEST_SIM_CTRL, 0);
         }
-        
+    */
 
     /* Print the instructions */
     print_help();
     printf("Ready\n> ");
-    
+
     /* Loop forever on user input */
     while (1) {
         if ((c = _inbyte (DLY_1S)) >= 0) {
-        
-            /* Escape Sequence ? */       
+
+            /* Escape Sequence ? */
             if (c == 0x1b) esc = 1;
-            else if (esc == 1 && c == 0x5b) esc = 2;  
+            else if (esc == 1 && c == 0x5b) esc = 2;
             else if (esc == 2) {
                 esc = 0;
                 if (c == 'A') {
                     /* Erase current line using backspaces */
                     for (j=0;j<i;j++)  _outbyte(0x08);
-                    
+
                     /* print last line and
                        make current line equal to last line  */
                     for (j=0;j<li;j++) _outbyte(buf[j] = lbuf[j]);
                     i = li;
                     }
-                continue;    
+                continue;
                 }
             else esc = 0;
-            
-            /* Character not part of escape sequence so print it 
+
+            /* Character not part of escape sequence so print it
                and add it to the buffer
-            */   
+            */
             if (!esc) {
-                _outbyte (c);            
+                _outbyte (c);
                 /* Backspace ? */
                 if (c == 8 && i > 0) { i--; }
                 else                 { buf[i++] = c; }
                 }
-                        
-            /* End of line ? */    
-            if (c == '\r' || i >= 19) { 
-                if (i>1) { 
+
+            /* End of line ? */
+            if (c == '\r' || i >= 19) {
+                if (i>1) {
                     /* Copy current line buffer to last line buffer */
-                    for (j=0;j<20;j++) lbuf[j] = buf[j]; 
+                    for (j=0;j<20;j++) lbuf[j] = buf[j];
                     li = i-1;
                     }
-                buf[i] = 0; i = 0; 
-                
+                buf[i] = 0; i = 0;
+
                 /* Process line */
                 printf("\n");
-                parse( buf ); 
+                parse( buf );
                 printf("> ");
                 }
             }
@@ -126,41 +125,50 @@ int main ( void ) {
 
 
 /* Parse a command line passed from main and execute the command */
-void parse ( char * buf ) 
+void parse ( char * buf )
 {
     unsigned int found, address, data, i, length, bytes, rdata;
     int file_size;
     char byte;
-    unsigned int lcount;                            
+    unsigned int lcount;
     char bad_command_msg[] = "Invalid command";
-    
+    volatile unsigned long *ptr = 0x00004000;
+    volatile unsigned long val = 0xAA550000;
+
     /* Ignore returns with no trext on the line */
     if (!buf[1]) return;
-        
+
     /* Check if its a single character instruction */
     if (buf[1] == '\r') {
         switch (buf[0]) {
-        
+
             case 'h': /* Help */
                 print_help();
                 break;
-                
-            case 'l': /* Load */  
+
+            case 'l': /* Load */
                 load_run(1,0);
                 break;
-
-            case 's': /* Status */    
+#if 1
+            case 's': /* Status */
                 _core_status();
                 /* Flush out the uart with spaces */
                 print_spaces(16);
                 printf  ("\n");
                 break;
-                
-            default:    
-                printf  ("%s\n", bad_command_msg);
+#else
+            case 'z': /* Write some SDRAM test patterns */
+                for (i = 0; i < 0x4000; i++) {
+                    *(ptr++) = val++;
+                }
+                printm(--ptr);
+                break;
+#endif
+            default:
+                printf  ("Invalid command\n", bad_command_msg);
                 break;
             }
-        return;    
+        return;
         }
 
 
@@ -172,9 +180,9 @@ void parse ( char * buf )
 
 
     switch (buf[0]) {
-    
+
             case 'd': /* Dump block of memory */
-                /* Dump memory contents <start address> <number of bytes in hex> */    
+                /* Dump memory contents <start address> <number of bytes in hex> */
                 if (get_address_data ( buf, &address, &bytes )) {
                     for (i=address;i<address+bytes;i+=4) {
                         printm (i);
@@ -182,25 +190,25 @@ void parse ( char * buf )
                     }
                 break;
 
-            case 'j': /* Jump to <address> */  
-                if (get_hex ( buf, 2, &address, &length )) { 
+            case 'j': /* Jump to <address> */
+                if (get_hex ( buf, 2, &address, &length )) {
                     load_run(0, address);
                     }
                 break;
 
 
             case 'p': /* Print String */
-                /* Recover the address from the string - the address is written in hex */  
-                if (get_hex ( buf, 2, &address, &length )) { 
+                /* Recover the address from the string - the address is written in hex */
+                if (get_hex ( buf, 2, &address, &length )) {
                     length = 0;
                     lcount = 0;
                     byte = * (char *)address++;
                     while ( byte < 128 && length < 0x1000 ) {
-                    
+
                         if ( byte != 0 )        _outbyte( byte );
                         if ( byte  == '\r' )    printf("\n"); lcount = 0;
                         if ( lcount == 79 )     printf("\n"); lcount = 0;
-                        
+
                         byte = * (char *)address++;
                         lcount++;
                         length++;
@@ -209,15 +217,15 @@ void parse ( char * buf )
                 break;
 
             case 'r': /* Read address */
-                /* Recover the address from the string - the address is written in hex */      
-                if (get_hex ( buf, 2, &address, &length )) { 
+                /* Recover the address from the string - the address is written in hex */
+                if (get_hex ( buf, 2, &address, &length )) {
                     printm (address);
                     }
                 break;
 
             case 'b': /* Load binary file into address */
-                /* Recover the address from the string - the address is written in hex */      
-                if (get_hex ( buf, 2, &address, &length )) { 
+                /* Recover the address from the string - the address is written in hex */
+                if (get_hex ( buf, 2, &address, &length )) {
                     load_run (5, address);
                     }
                 break;
@@ -231,44 +239,44 @@ void parse ( char * buf )
                     printm (address);
                     }
                 break;
-            
-            default:    
+
+            default:
                 printf  ("%s\n", bad_command_msg);
                 break;
-        }        
+        }
 }
 
 
 /* Load a binary file into memory via the UART
    If its an elf file, copy it into the correct memory areas
    and execute it.
-*/   
+*/
 void load_run( int type, unsigned int address )
 {
-    int file_size;        
+    int file_size;
     char * message = "Send file w/ 1K Xmodem protocol from terminal emulator now...";
-    
+
     switch (type) {
-        
-        case 1: /* Load a binary file to FILE_LOAD_BASE */   
+
+        case 1: /* Load a binary file to FILE_LOAD_BASE */
             /* Load a file using the xmodem protocol */
             printf  ("%s\n", message);
 
                                       /*       Destination,    Destination Size */
-            file_size = xmodemReceive((char *) FILE_LOAD_BASE, FILE_MAX_SIZE);   
+            file_size = xmodemReceive((char *) FILE_LOAD_BASE, FILE_MAX_SIZE);
             if (file_size < 0 || file_size > FILE_MAX_SIZE) {
                 printf ("Xmodem error file size 0x%x \n", file_size);
                 return;
                 }
-                
+
             printf("\nelf split\n");
             elfsplitter(FILE_LOAD_BASE, file_size);
             break;
-    
+
 
         case 2: /* testing the boot loader itself in simulation */
             print_help();
-            _core_status();        
+            _core_status();
             print_spaces(16);
             _testpass();
             break;
@@ -295,12 +303,12 @@ void load_run( int type, unsigned int address )
             _testpass();
             break;
 
-            
-        case 5: /* Load a binary file into memory, to 'address' */    
+
+        case 5: /* Load a binary file into memory, to 'address' */
             /* Load a file using the xmodem protocol */
             printf  ("%s\n", message);
                                       /*       Destination,    Destination Size */
-            file_size = xmodemReceive((char *) address, FILE_MAX_SIZE);   
+            file_size = xmodemReceive((char *) address, FILE_MAX_SIZE);
             if (file_size < 0 || file_size > FILE_MAX_SIZE) {
                 printf ("Xmodem error file size 0x%x \n", file_size);
                 return;
@@ -308,7 +316,7 @@ void load_run( int type, unsigned int address )
             break;
 
 
-        default:    /* Run the program */    
+        default:    /* Run the program */
             printf("j 0x%08x\n", address);
             /* Flush the uart tx buffer with spaces */
             print_spaces(16);
@@ -322,70 +330,70 @@ void load_run( int type, unsigned int address )
 
 
 /* Print a memory location */
-void printm ( unsigned int address ) 
+void printm ( unsigned int address )
 {
-    printf ("mem 0x%08x = 0x%08x\n", address, * (unsigned int *)address);
+    printf ("mem 0x%08x = 0x%08x\n", address, *(volatile unsigned int *)address);
 }
 
 
-void print_help ( void ) 
+void print_help ( void )
 
 {
     printf("Commands\n");
-    printf("l");                     
+    printf("l");
     print_spaces(29);
     printf(": Load elf file\n");
 
-    printf("b <address>");                   
+    printf("b <address>");
     print_spaces(19);
     printf(": Load binary file to <address>\n");
 
     printf("d <start address> <num bytes> : Dump mem\n");
 
-    printf("h");                     
+    printf("h");
     print_spaces(29);
     printf(": Print help message\n");
 
-    printf("j <address>");                     
+    printf("j <address>");
     print_spaces(19);
     printf(": Execute loaded elf, jumping to <address>\n");
 
-    printf("p <address>");                   
+    printf("p <address>");
     print_spaces(19);
     printf(": Print ascii mem until first 0\n");
-    
-    printf("r <address>");                   
+
+    printf("r <address>");
     print_spaces(19);
     printf(": Read mem\n");
 
-    printf("s");                              
+    printf("s");
     print_spaces(29);
     printf(": Core status\n");
-    
-    printf("w <address> <value>");            
+
+    printf("w <address> <value>");
     print_spaces(11);
-    printf(": Write mem\n");    
+    printf(": Write mem\n");
 }
 
 
 /* Print a number of spaces */
-void print_spaces ( int num ) 
+void print_spaces ( int num )
 {
     while(num--) printf(" ");
 }
 
 
 /* Return a number recovered from a string of hex digits */
-int get_hex ( char * buf, int start_position, 
-              unsigned int *address, 
-              unsigned int *length) 
+int get_hex ( char * buf, int start_position,
+              unsigned int *address,
+              unsigned int *length)
 {
-                       
+
     int cpos = 0, done = 0;
 
     cpos = start_position; done = 0; *address = 0;
 
-    while (done == 0) {    
+    while (done == 0) {
         if ( buf[cpos] >= '0' && buf[cpos] <= '9' ) {
            *address = *address<<4;
            *address = *address + buf[cpos] - '0';
@@ -408,14 +416,14 @@ int get_hex ( char * buf, int start_position,
             }
         cpos++;
         }
-            
+
     /* Return the length of the hexadecimal string */
     if (cpos > start_position+1) return 1; else return 0;
 }
 
 
 /* Parse a string for an address and data in hex */
-int get_address_data ( char * buf, unsigned int *address, unsigned int *data ) 
+int get_address_data ( char * buf, unsigned int *address, unsigned int *data )
 {
     int found, length;
 
@@ -424,7 +432,7 @@ int get_address_data ( char * buf, unsigned int *address, unsigned int *data )
         /* Get the data */
         found = get_hex ( buf, 3+length, data, &length );
         }
-    
-    return found;    
+
+    return found;
 }
 

@@ -66,84 +66,84 @@
 
 
 	.section .text
-	.globl	start 
-start:               
+	.globl	start
+start:
         /* 0x00 Reset Interrupt vector address */
         b       startup
 
         /* 0x04 Undefined Instruction Interrupt vector address */
         b       _testfail
-        
+
         /* 0x08 SWI Interrupt vector address */
         b       _testfail
-        
+
         /* 0x0c Prefetch abort Interrupt vector address */
         b       _testfail
-        
+
         /* 0x10 Data abort Interrupt vector address */
         b       _testfail
         b       _testfail
-        
+
         /* 0x18 IRQ vector address */
         b       _testfail
-        
+
         /* 0x1c FIRQ vector address */
         b       _testfail
-        
+
 startup:
         /* Unset interrupt mask bits, stay in svc mode */
         mov     r0, #0x00000003
-        teqp    pc, r0 
- 
+        teqp    pc, r0
+
         @ Enable the cache
         mov     r0, #0xffffffff
 	mcr	15, 0, r0, cr3, cr0, 0   @ cacheable area
         mov     r0, #1
 	mcr	15, 0, r0, cr2, cr0, 0   @ cache enable
-        
+
         @ init SP
         ldr     sp, AdrStack
-
+/*
         @ Set 32MB memory mode
         ldr     r0, AdrMemCtrl
         mov     r1, #1
         str     r1, [r0]
-        
+*/
         .extern main
         bl      main
-                
+
         @ jump to program at r0
 	.globl _jump_to_program
 _jump_to_program:
 
-        
+
         @ ----------------------------------------------
         @ Copy ATAG structure to AdrBootParams
         @ ----------------------------------------------
         ldr     r1, AdrBootParams
         ldr     r2, AdrATAGBase
         ldr     r3, AdeEndATAG
-        
+
 1:      cmp     r2, r3
         beq     2f
         ldr     r4, [r2], #4
         str     r4, [r1], #4
         b       1b
-        
+
         @ Set memc page tables
-2:      ldr     r2, AdrPageTabes        
+2:      ldr     r2, AdrPageTabes
         mov     r3, #0
         mov     r4, #40
 3:      str     r3,[r2],#4
         subs    r4, r4, #1
         bne     3b
-           
+
         @ ----------------------------------------------
         @ jump to start of program in svc mode with interrupts disabled
         @ ----------------------------------------------
         mov     r4, r0
         orr     r4, #0x0c000003
-        mov     r0, #0  
+        mov     r0, #0
         mov     pc, r4
 
 
@@ -157,33 +157,33 @@ _core_status:
         mov     r4, #0
         mov     r5, sp
         mov     r6, lr
-        
+
 1:      ldr     r0, =Status_Message
         mov     r1, r4
         ldr     r2, [r5], #4
         bl      printf
-        
+
         cmp     r4, #13
         addne   r4, r4, #1
         bne     1b
-        
+
         @ Stack Pointer
         ldr     r0, =SPStatus_Message
         mov     r1, sp
         bl      printf
-        
+
         @ Program Counter - Use Link Register value because
         @ want the PC value of whatever called this function
         ldr     r0, =PCStatus_Message
         sub     r1, r6, #4
         bl      printf
-                
+
         ldmia  sp!,{r0-r12}
         ldmia  sp!,{pc}^
-        
+
 
 /* stack at top of ddr3 memory space */
-AdrStack:                   .word 0x02000000
+AdrStack:                   .word 0x00001f60 /*0x02000000*/
 AdrMemCtrl:                 .word ADR_AMBER_TEST_MEM_CTRL
 
 /* core status messages */
@@ -200,7 +200,7 @@ ATAGBase:                   .word ATAG_CORE_SIZE
                             .word FLAG_READONLY     @ flags
                             .word 4096              @ page size
                             .word 0x0               @ rootdev
-                
+
                             .word ATAG_MEM_SIZE
                             .word ATAG_MEM
                             .word 32*1024*1024      @ size - 32MB
@@ -216,7 +216,7 @@ ATAGBase:                   .word ATAG_CORE_SIZE
                             .word ATAG_INITRD
                             .word 0x02800000        @ virtual address of start of initrd image
                             .word 0x00032000        @ size = 200k
-                
+
                             .word ATAG_NONE
                             .word 0x0
 EndATAG:                    .word 0x0

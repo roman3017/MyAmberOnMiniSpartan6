@@ -30,6 +30,10 @@ use IEEE.STD_LOGIC_1164.ALL;
 --use UNISIM.VComponents.all;
 
 entity SDRAM_WB_CTRL is
+	generic (
+		sdram_address_width : integer := 24;
+		cycles_per_refresh  : natural := (64000*100)/8192-1
+	);
 	port (
 		WB_CLK_I: in std_logic;
 		WB_RST_I: in std_logic;
@@ -41,7 +45,7 @@ entity SDRAM_WB_CTRL is
 		WB_STB_I: in std_logic;
 		WB_SEL_I: in std_logic_vector(3 downto 0);
 		WB_ACK_O: out std_logic;
-		wb_stall_o: out std_logic;
+--		wb_stall_o: out std_logic;
 		-- extra clocking
 --		clk_off_3ns: in std_logic;
 		-- SDRAM signals
@@ -63,7 +67,8 @@ architecture Behavioral of SDRAM_WB_CTRL is
 
 	component sdram_controller is
 		generic (
-			HIGH_BIT: integer := 24
+			sdram_address_width : natural;
+			cycles_per_refresh  : natural
 		);
 		PORT (
 			clk: in std_logic;
@@ -82,7 +87,7 @@ architecture Behavioral of SDRAM_WB_CTRL is
 			SDRAM_WE : OUT STD_LOGIC;
 --			pending: out std_logic;
 			--- Inputs from rest of the system
-			cmd_address : IN STD_LOGIC_VECTOR (HIGH_BIT downto 2);
+			cmd_address : IN STD_LOGIC_VECTOR (sdram_address_width-2 downto 0);
 			cmd_enable : IN STD_LOGIC;
 			cmd_wr : IN STD_LOGIC;
 			data_out : OUT STD_LOGIC_VECTOR (31 downto 0);
@@ -92,7 +97,7 @@ architecture Behavioral of SDRAM_WB_CTRL is
 		);
 	end component;
 	
-	signal sdr_address: STD_LOGIC_VECTOR (24 downto 2);
+	signal sdr_address: STD_LOGIC_VECTOR (sdram_address_width-2 downto 0);
 	signal sdr_req_read : STD_LOGIC;
 	signal sdr_req_write : STD_LOGIC;
 	signal sdr_data_out : STD_LOGIC_VECTOR (31 downto 0);
@@ -104,7 +109,8 @@ architecture Behavioral of SDRAM_WB_CTRL is
 begin
 	ctrl: sdram_controller
 		generic map (
-			HIGH_BIT => 24
+			sdram_address_width => sdram_address_width,
+			cycles_per_refresh => cycles_per_refresh
 		)
 		port map (
 			clk => wb_clk_i,
@@ -130,7 +136,7 @@ begin
 			cmd_byte_enable => sdr_data_mask
 		);
 		
-	sdr_address(24 downto 2) <= WB_ADR_I(24 downto 2);
+	sdr_address <= WB_ADR_I(sdram_address_width downto 2);
 	
 	sdr_req_read<='1' when WB_CYC_I='1' and WB_STB_I='1' and WB_WE_I='0' else '0';
 	sdr_req_write<='1' when WB_CYC_I='1' and WB_STB_I='1' and WB_WE_I='1' else '0';
